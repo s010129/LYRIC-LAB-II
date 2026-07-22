@@ -264,6 +264,7 @@ body.zen #zenTip{display:block}
         <button class="cbtn sm" id="oP1">+0.1</button>
         <button class="cbtn sm" id="oP5">+0.5</button>
         <button class="cbtn sm" id="oSnap" style="min-width:auto;padding:0 .6rem">對齊此句</button>
+        <button class="cbtn sm" id="oFirst" style="min-width:auto;padding:0 .6rem" title="第一句唱出來的瞬間按">對齊第一句</button>
       </div>
       <div class="advrow">
         <span class="advlab">漂移</span>
@@ -389,6 +390,8 @@ body.zen #zenTip{display:block}
         底部中央有一個 <b style="color:var(--accent)">▲ 進階</b>，點開才會出現校正工具。<br><br>
         <b style="color:var(--text)">整首固定慢或快幾秒</b><br>
         等某句真正唱出來的瞬間，按「對齊此句」，一次修好。也可以用 ±0.1 / ±0.5 微調。<br><br>
+        <b style="color:var(--text)">偏很多（影片前奏比較長）</b><br>
+        MV 常有額外的前奏或口白，導致整份歌詞提早跑掉，這時高亮的句子早就跑到後面去了，「對齊此句」會越按越錯。改用 <b style="color:var(--accent)">「對齊第一句」</b>：從頭播放，在<b>第一句歌詞真正唱出來的那一刻</b>按下去，整首就會校正完成。<br><br>
         <b style="color:var(--text)">越唱越偏（前面準後面歪）</b><br>
         代表影片版本和歌詞版本速度不同。在歌曲前段某句開始唱時按「設 A」，快轉到後段（至少隔 20 秒）某句開始唱時按「設 B」，系統會自動算出比例修正整首。按「重設」還原。<br><br>
         <b style="color:var(--text)">歌詞根本是別首</b><br>
@@ -449,7 +452,7 @@ function showPlay(){$('scHome').style.display='none';$('scPlay').style.display='
 
 /* ============ 狀態 ============ */
 const S={
-  lines:[],idx:-1,playing:false,dur:0,
+  lines:[],idx:-1,playing:false,dur:0,lrcDur:0,
   offset:0,scale:1,calA:null,anchor:.38,
   repeat:false,abA:null,abB:null,
   vocab:[],
@@ -526,8 +529,10 @@ async function startFlow(raw,msgEl){
   const list=await searchLrc(title,artist);
   if(list.length){
     applyLrc(list[0].syncedLyrics);
+    S.lrcDur=list[0].duration||0;
     $('tbSub').textContent=(artist||'')+' · '+S.lines.length+' 行';
     toast('歌詞已套用，按播放開始');
+    setTimeout(checkDur,2500);
   }else{
     S.lines=[];
     $('lyricBox').innerHTML='<div class="nolyric">找不到這首的逐行歌詞<br>可以到「換歌」改歌名重搜，或手動貼上 LRC</div>';
@@ -677,6 +682,16 @@ $('cFull').onclick=()=>{const el=document.documentElement;
 $('tbVideo').onclick=()=>$('ytHolder').classList.toggle('show');
 $('chev').onclick=()=>{const a=$('adv').classList.toggle('open');$('chev').textContent=a?'▼ 收合':'▲ 進階'};
 
+/* 比對「歌詞對應的曲長」與「影片長度」，落差大代表版本可能不同 */
+function checkDur(){
+  const vd=dur();
+  if(!S.lrcDur||!vd)return;
+  const diff=vd-S.lrcDur;
+  if(Math.abs(diff)>8){
+    toast('注意：影片比歌詞版本'+(diff>0?'長':'短')+' '+Math.abs(Math.round(diff))+' 秒，可能是不同版本。用「對齊第一句」或換一筆歌詞',6000);
+  }
+}
+
 /* ============ 沉浸模式 ============ */
 let zen=false,peekT=null;
 function enterZen(){
@@ -736,6 +751,13 @@ $('oSnap').onclick=()=>{
   if(S.idx<0||!S.lines[S.idx]){toast('等歌詞跑起來再按');return}
   S.offset=S.lines[S.idx].t-S.scale*pos();showOff();S.idx=-1;
   toast('已對齊（'+(S.offset>0?'+':'')+S.offset.toFixed(1)+'s）');
+};
+$('oFirst').onclick=()=>{
+  if(!S.lines.length){toast('尚未載入歌詞');return}
+  const p=pos();
+  if(p<0.5){toast('請在第一句唱出來的那一刻按',3000);return}
+  S.offset=S.lines[0].t-S.scale*p;showOff();S.idx=-1;
+  toast('已用第一句對齊（'+(S.offset>0?'+':'')+S.offset.toFixed(1)+'s）',3000);
 };
 $('oA').onclick=()=>{
   if(S.idx<0){toast('等歌詞跑起來再按');return}
@@ -877,8 +899,9 @@ $('btnLrc').onclick=async()=>{
   l.slice(0,6).forEach(x=>{
     const d=document.createElement('div');d.className='res';
     d.innerHTML=`<b style="font-size:.87rem">${esc(x.trackName)}</b><small>${esc(x.artistName||'')} · ${fmt(x.duration||0)}</small>`;
-    d.onclick=()=>{applyLrc(x.syncedLyrics);$('tbSub').textContent=(x.artistName||'')+' · '+S.lines.length+' 行';
-      $('ovChange').classList.remove('show');toast('已換上這筆歌詞')};
+    d.onclick=()=>{applyLrc(x.syncedLyrics);S.lrcDur=x.duration||0;
+      $('tbSub').textContent=(x.artistName||'')+' · '+S.lines.length+' 行';
+      $('ovChange').classList.remove('show');toast('已換上這筆歌詞');checkDur()};
     box.appendChild(d);
   });
 };
