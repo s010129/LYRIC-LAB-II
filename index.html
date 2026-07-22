@@ -166,7 +166,8 @@ body.zen #topbar b{font-family:'Orbitron',monospace;font-size:.82rem;letter-spac
 body.zen #topbar small{display:none}
 body.zen #ytHolder{max-height:0!important}
 body.zen #lyricBox{padding:44vh 1.2rem}
-body.zen .line.active .en{font-size:clamp(1.5rem,7vw,3rem)}
+body.zen .line{max-width:1000px;margin:0 auto}
+body.zen .line.active .en{font-size:clamp(1.4rem,min(6.5vw,8.5vh),3rem)}
 body.zen .ltool{display:none!important}
 body.zen #dock{position:fixed;left:0;right:0;bottom:0;opacity:0;transform:translateY(100%);transition:all .28s ease;pointer-events:none;z-index:60}
 body.zen #dock.peek{opacity:1;transform:translateY(0);pointer-events:auto}
@@ -187,6 +188,18 @@ body.zen #zenTip{display:block}
   .modal{border-radius:20px 20px 0 0;max-height:92dvh}
   #lyricBox{padding:38vh .6rem}
   body.zen #lyricBox{padding:42vh 1rem}
+}
+/* 橫向 / 矮視窗：縮小字級與間距，避免長句被切掉 */
+@media(orientation:landscape) and (max-height:600px){
+  body.zen #topbar{padding:.45rem 1rem .1rem}
+  body.zen #topbar b{font-size:.66rem;letter-spacing:1.5px}
+  body.zen #lyricWrap::before,body.zen #lyricWrap::after{height:34px}
+  body.zen #lyricBox{padding:42vh 2rem}
+  body.zen .line{padding:.3rem .6rem}
+  body.zen .line .en{font-size:clamp(.85rem,2.8vh,1.1rem)}
+  body.zen .line.active .en{font-size:clamp(1.15rem,5.4vh,2.1rem)}
+  body.zen .line .zh{font-size:.75rem}
+  #zenTip{bottom:.7rem;font-size:.62rem;padding:.35rem .8rem}
 }
 
 </style>
@@ -611,7 +624,14 @@ function hl(){
   }
   const c=k[S.idx];
   if(c&&S.set.autoScroll&&!scrolling){
-    box.scrollTo({top:Math.max(0,c.offsetTop-box.clientHeight*S.anchor+c.offsetHeight/2),behavior:'smooth'});
+    const bh=box.clientHeight;
+    // 視窗矮（橫向）時錨點自動往中間靠，避免當前句貼太上面
+    const an=bh<560?Math.max(S.anchor,.44):S.anchor;
+    let target=c.offsetTop-bh*an+c.offsetHeight/2;
+    // 保護：不論句子多長，該句頂端一定留在可視範圍內
+    const gap=Math.max(20,bh*.08);
+    target=Math.min(target,c.offsetTop-gap);
+    box.scrollTo({top:Math.max(0,target),behavior:'smooth'});
     if(S.set.lineTrans){
       const zh=c.querySelector('.zh');
       if(zh&&!zh.classList.contains('show')){zh.classList.add('show');zh.textContent='…';
